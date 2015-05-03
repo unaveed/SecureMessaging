@@ -1,4 +1,5 @@
-import sys, logging
+import sys
+import logging
 import socket
 import pickle
 from Crypto.PublicKey import RSA
@@ -154,17 +155,33 @@ class Bob:
 
 
 def main(argv):
-    host = ''
+    host = 'localhost'
     port = 4112
 
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
+    host_cmd = False
+    port_cmd = False
+    for arg in argv:
+        if arg == '-h':
+            print "Usage: python Bob.py [-v verbose] [-r host-name] [-p port]"
+        if arg == '-v':
+            root = logging.getLogger()
+            root.setLevel(logging.INFO)
 
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    ch.setFormatter(formatter)
-    root.addHandler(ch)
+            ch = logging.StreamHandler(sys.stdout)
+            ch.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            ch.setFormatter(formatter)
+            root.addHandler(ch)
+        if arg == '-r':
+            host_cmd = True
+        if arg == '-p':
+            port_cmd = True
+        if host_cmd:
+            host = arg
+            host_cmd = False
+        if port_cmd:
+            port = arg
+            port_cmd = False
 
     bob = Bob(host, port)
     bob.run()

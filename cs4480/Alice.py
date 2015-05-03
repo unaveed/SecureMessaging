@@ -112,14 +112,14 @@ class Alice():
         h = SHA.new(ds[0])
         verifier = PKCS1_v1_5.new(kc_public)
         if verifier.verify(h, ds[1]):
-            logging.info("Alice: Successfully verified Bob's public key and digital signature")
+            logging.info("Alice: Successfully verified Bob's digital signature, obtained Bob's public key.")
             self.bob_public_key = RSA.importKey(ds[0])
 
             # Generate digital signature and symmetric key
             try:
                 message = raw_input("Enter message: ")
             except EOFError:
-                logging.warning("Unable to read user input")
+                logging.warning("Unable to read user input, using default message")
                 message = "Hi Bob this is Alice"
 
             ds = self.generate_digital_signature(message)
@@ -129,10 +129,8 @@ class Alice():
 
             # Encrypt digital signature with 3DES
             dig_sig = triple_des[0].encrypt(ds_str)
-            session_key_bundle = [self.bob_public_key.encrypt(''.join(dig_sig), 256)]
-            session_key_bundle.append(triple_des[1])
-            session_key_bundle.append(triple_des[2])
-            session_key_bundle.append(triple_des[3])
+            session_key_bundle = [self.bob_public_key.encrypt(''.join(dig_sig), 256),
+                                  triple_des[1], triple_des[2], triple_des[3]]
 
             block = [dig_sig, session_key_bundle]
 
@@ -158,14 +156,40 @@ def main(argv):
     port = 4112
     key = os.urandom(16)
 
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    ch.setFormatter(formatter)
-    root.addHandler(ch)
+    host_cmd = False
+    port_cmd = False
+    key_cmd = False
+    for arg in argv:
+        if arg == '-h':
+            message = "Usage: python Alice.py [-v verbose] [-r host-name] "
+            message += "[-p port] [-k secret-key]"
+            print message
+        if arg == '-v':
+            root = logging.getLogger()
+            root.setLevel(logging.INFO)
+            ch = logging.StreamHandler(sys.stdout)
+            ch.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            ch.setFormatter(formatter)
+            root.addHandler(ch)
+        if arg == '-r':
+            host_cmd = True
+        if arg == '-p':
+            port_cmd = True
+        if arg == '-k':
+            key_cmd = True
+        if host_cmd:
+            host = arg
+            host_cmd = False
+        if port_cmd:
+            port = arg
+            port_cmd = False
+        if key_cmd:
+            if len(arg) != 16 or len(arg) != 8:
+                print "Key must be 8 or 16 bytes, using default key"
+            else:
+                key = arg
+            key_cmd = False
 
     alice = Alice(host,port)
     alice.connect(key)
