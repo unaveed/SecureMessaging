@@ -4,6 +4,7 @@ import pickle
 import os
 import logging
 import time
+import binascii
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA
 from Crypto.Signature import PKCS1_v1_5
@@ -17,7 +18,7 @@ class Alice():
         try:
             self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except:
-            logging.error("Could not create socket")
+            print "Could not create socket"
             exit()
         self.buff_size = 8192
         self.host = host
@@ -57,24 +58,32 @@ class Alice():
             padding_amount = block_size - (len(enc_str) % block_size)
             for x in range(0, padding_amount):
                 enc_str += padding
+        logging.info("Padded string: {}".format(binascii.hexlify(bytearray(enc_str))))
         return enc_str
 
     def generate_digital_signature(self, message):
         h = SHA.new(message)
         signer = PKCS1_v1_5.new(self.private_key)
         ds = signer.sign(h)
-        logging.info("Alice: Generated digital signature.")
+        logging.info("Alice: Generated digital signature:")
+        logging.info(binascii.hexlify(bytearray(ds)))
         return [ds, message]
 
     # Generates and returns a 3DES symmetric key and parameters for key
     def generate_symmetric_key(self, key):
         str_size = 8
         iv = os.urandom(str_size)
-        logging.info("Alice: Generated 3DES symmetric key")
+        logging.info("Alice: Generated 3DES symmetric key:")
+        logging.info("IV: {}".format(binascii.hexlify(bytearray(iv))))
+        logging.info("Key: {}".format(binascii.hexlify(bytearray(key))))
         return [DES3.new(key, DES3.MODE_CBC, iv), key, DES3.MODE_CBC, iv]
 
     # Connect to the server
     def connect(self, key):
+        logging.info("Alice Public Key: {}".format(binascii.hexlify(bytearray(self.public_key.exportKey()))))
+        logging.info("Alice Private Key: {}".format(binascii.hexlify(bytearray(self.private_key.exportKey()))))
+        logging.info("CA Public Key: {}".format(binascii.hexlify(bytearray(self.cert_key.exportKey()))))
+
         address = (self.host, self.port)
         self.client.connect(address)
         self.client.setblocking(0)
@@ -104,7 +113,7 @@ class Alice():
         try:
             ds = pickle.loads(buff)
         except:
-            logging.error("Alice: Unable to unpickle object, exiting")
+            print "Alice: Unable to unpickle object, exiting"
             sys.exit()
 
         logging.info("Alice: Unpickled object.")
@@ -129,6 +138,7 @@ class Alice():
 
             # Encrypt digital signature with 3DES
             dig_sig = triple_des[0].encrypt(ds_str)
+            logging.info("\nDigital Signature: {}".format(binascii.hexlify(bytearray(dig_sig))))
             session_key_bundle = [self.bob_public_key.encrypt(''.join(dig_sig), 256),
                                   triple_des[1], triple_des[2], triple_des[3]]
 
@@ -137,10 +147,11 @@ class Alice():
             try:
                 payload = pickle.dumps(block)
             except:
-                logging.error("Alice: Unable to pickle package, exiting")
+                print "Alice: Unable to pickle package, exiting"
                 sys.exit()
 
             self.client.sendall(payload)
+            logging.info("Encrypted package: {}".format(binascii.hexlify(bytearray(payload))))
             logging.info("Sent encrypted bundle to Bob. Closing connection.")
             self.client.shutdown
             self.client.close()
@@ -153,7 +164,7 @@ class Alice():
 
 def main(argv):
     host = ''
-    port = 4112
+    port = 2113
     key = os.urandom(16)
 
     host_cmd = False
@@ -172,12 +183,6 @@ def main(argv):
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             ch.setFormatter(formatter)
             root.addHandler(ch)
-        if arg == '-r':
-            host_cmd = True
-        if arg == '-p':
-            port_cmd = True
-        if arg == '-k':
-            key_cmd = True
         if host_cmd:
             host = arg
             host_cmd = False
@@ -185,11 +190,17 @@ def main(argv):
             port = arg
             port_cmd = False
         if key_cmd:
-            if len(arg) != 16 or len(arg) != 8:
-                print "Key must be 8 or 16 bytes, using default key"
+            if len(arg) != 8:
+                print "Key must be 8 bytes, using default key"
             else:
                 key = arg
             key_cmd = False
+        if arg == '-r':
+            host_cmd = True
+        if arg == '-p':
+            port_cmd = True
+        if arg == '-k':
+            key_cmd = True
 
     alice = Alice(host,port)
     alice.connect(key)

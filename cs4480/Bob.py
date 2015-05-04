@@ -2,6 +2,7 @@ import sys
 import logging
 import socket
 import pickle
+import binascii
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA
@@ -67,11 +68,14 @@ class Bob:
         mode = session_key_bundle[2]
         iv = session_key_bundle[3]
         logging.info("Bob: Re-created 3DES key from senders package")
+        logging.info("Key {}".format(binascii.hexlify(bytearray(key))))
+        logging.info("IV {}".format(binascii.hexlify(bytearray(iv))))
         return DES3.new(key, mode, iv)
 
     def remove_padding(self, enc_str):
         block_size = 8
         padding = '{'
+        logging.info("String with padding: {}".format(binascii.hexlify(bytearray(enc_str))))
         logging.info("Bob: Removing padding from pickled object")
         return enc_str.strip(padding)
 
@@ -90,6 +94,11 @@ class Bob:
 
     def run(self):
         key = self.public_key.exportKey()
+        logging.info("Bob's Public Key: {}".format(binascii.hexlify(bytearray(key))))
+        logging.info("Bob's Private Key: {}".format(binascii.hexlify(bytearray(self.private_key.exportKey()))))
+        logging.info("Alice's Public Key: {}".format(binascii.hexlify(bytearray(self.alice_key.exportKey()))))
+        logging.info("CA Public Key: {}".format(binascii.hexlify(bytearray(self.cert_public_key.exportKey()))))
+        logging.info("CA Private Key: {}".format(binascii.hexlify(bytearray(self.cert_private_key.exportKey()))))
 
         digest = self.generate_digital_signature(key, self.cert_private_key)
         ds = [key, digest]
@@ -97,7 +106,7 @@ class Bob:
         try:
             digest_obj = pickle.dumps(ds)
         except:
-            logging.ERROR("Bob: Could not pickle message digest, exiting.")
+            print "Bob: Could not pickle message digest, exiting."
             sys.exit()
 
         buff = ''
@@ -122,12 +131,13 @@ class Bob:
                 payload = pickle.loads(buff)
                 logging.info("Bob: Loaded encrypted package from sender.")
             except:
-                logging.ERROR("Bob: Unable to unpickle object, exiting.")
+                print "Bob: Unable to unpickle object, exiting."
                 sys.exit()
 
             ds = payload[0]
             symmetric_key = self.get_session_key(payload[1])
             logging.info("Bob: Retrieved symmetric key from package.")
+            logging.info("Digital Signature: {}".format(binascii.hexlify(bytearray(ds))))
 
             padded_str = symmetric_key.decrypt(ds)
             pickled_obj = self.remove_padding(padded_str)
@@ -136,7 +146,7 @@ class Bob:
                 digital_signature = pickle.loads(pickled_obj)
                 logging.info("Bob: Unpickled digital signature")
             except:
-                logging.ERROR("Bob: Could not unpickle digital signature, exiting")
+                print "Bob: Could not unpickle digital signature, exiting"
                 sys.exit()
 
             h = SHA.new(digital_signature[1])
@@ -155,8 +165,8 @@ class Bob:
 
 
 def main(argv):
-    host = 'localhost'
-    port = 4112
+    host = ''
+    port = 2113
 
     host_cmd = False
     port_cmd = False
@@ -172,16 +182,16 @@ def main(argv):
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             ch.setFormatter(formatter)
             root.addHandler(ch)
-        if arg == '-r':
-            host_cmd = True
-        if arg == '-p':
-            port_cmd = True
         if host_cmd:
             host = arg
             host_cmd = False
         if port_cmd:
             port = arg
             port_cmd = False
+        if arg == '-r':
+            host_cmd = True
+        if arg == '-p':
+            port_cmd = True
 
     bob = Bob(host, port)
     bob.run()
