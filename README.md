@@ -11,8 +11,8 @@ Accepts the following command-line arguments
 
 	-h Help, displays list of acceptable arguments
 
-	-r [hostname] Specify which which to connect/run on.
+	-r [hostname] Specify which host to connect/run on.
 
-	-p [port] Specifiy whihc port the program will run on.
+	-p [port] Specifiy which port the program will run on.
 
 	-k [key] for providing a passphrase for encryption (only Alice.py accepts this argument)
